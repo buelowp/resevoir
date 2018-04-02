@@ -10,22 +10,26 @@ connected = False
 
 def turn_pump_on():
 	global oled_address
-	relayExp.setChannel(oled_address, 0, 1)
+	if (relayExp.setChannel(oled_address, 0, 1) == 0):
+		client.publish("control/pump/on")
 	print_status()
 
 def turn_pump_off():
 	global oled_address
-	relayExp.setChannel(oled_address, 0, 0)
+	if (relayExp.setChannel(oled_address, 0, 0) == 0):
+		client.publish("control/pump/off")
 	print_status()
 
 def open_valve():
 	global oled_address
-	relayExp.setChannel(oled_address, 1, 1)
+	if (relayExp.setChannel(oled_address, 1, 1) == 0):
+		client.publish("control/valve/open")
 	print_status()
 
 def close_valve():
 	global oled_address
-	relayExp.setChannel(oled_address, 1, 0)
+	if (relayExp.setChannel(oled_address, 1, 0) == 0):
+		client.publish("control/valve/close")
 	print_status()
 
 def run_test():
@@ -52,17 +56,26 @@ def print_relay1_status():
 	global oled_address
 	oledExp.setCursor(4, 0)
 	if (relayExp.readChannel(oled_address, 0) == 0):
-		oledExp.write("Relay 0 is off")
+		oledExp.write("Pump:  off")
 	else:
-		oledExp.write("Relay 0 is on ")
+		oledExp.write("Pump:  on ")
 
 def print_relay2_status():
 	global oled_address
 	oledExp.setCursor(5, 0)
 	if (relayExp.readChannel(oled_address, 1) == 0):
-		oledExp.write("Relay 1 is off")
+		oledExp.write("Valve: closed")
 	else:
-		oledExp.write("Relay 1 is on ")
+		oledExp.write("Valve: open  ")
+
+def return_state():
+	relayState = '00'
+	if (relayExp.readChannel(oled_address, 0) == 1):
+		relayState[0] = '1'
+	if (relayExp.readChannel(oled_address, 1) == 1):
+		relayState[1] = '1'
+
+	client.publish("control/state", relayState, 1, True)
 
 def print_relay_status():
 	global oled_address
@@ -108,7 +121,8 @@ def on_message(client, userdata, message):
 	if (message.topic == "resevoir/test"):
 		run_test()
 
-#	print("Received message '" + str(message.payload) + "' on topic '" + message.topic + "' with QoS " + str(message.qos))
+	if (message.topic == "resevoir/state"):
+		return_state()
 
 def main(argv):
 	global oled_address
@@ -134,7 +148,7 @@ def main(argv):
 		client.loop_stop() #stop loop
 		relayExp.setChannel(oled_address, 0, 0)
 		relayExp.setChannel(oled_address, 1, 0)
-		time.sleep(5)
+		time.sleep(2)
 		sys.exit(0)
 	
 if __name__ == "__main__":
