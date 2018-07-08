@@ -8,7 +8,7 @@
 #include "InternetButton.h"
 #include "FastLED.h"
 
-#define APP_ID  11
+#define APP_ID  18
 FASTLED_USING_NAMESPACE;
 
 void subCallback(char*, byte*, unsigned int);
@@ -22,10 +22,13 @@ bool g_receivedPing;
 bool g_relayOn;
 unsigned long g_lockout;
 int g_missedPingCount;
+int g_lastState;
+int g_lastLength;
+int appId;
 
-#define TEST_RELAY_ON   0x00000001
-#define TEST_VALVE_ON   0x00000010
-#define TEST_PUMP_ON    0x00000100
+#define TEST_FILTER_ON   0x00000001
+#define TEST_VALVE_ON    0x00000010
+#define TEST_PUMP_ON     0x00000100
 
 void subCallback(char* t, byte* p, unsigned int length)
 {
@@ -47,41 +50,47 @@ void subCallback(char* t, byte* p, unsigned int length)
         btn.ledOn(6, 255, 0, 0);
         g_valveOpen = false;
     }
-    if (topic == "aquarium/relay/on") {
-        btn.ledOn(0, 0, 255, 0);
+    if (topic == "aquarium/filter/on") {
+        btn.ledOn(9, 0, 255, 0);
         g_relayOn = true;
     }
-    if (topic == "aquarium/relay/off") {
-        btn.ledOn(0, 255, 0, 0);
+    if (topic == "aquarium/filter/off") {
+        btn.ledOn(98, 255, 0, 0);
         g_relayOn = false;
     }
     if (topic == "aquarium/state") {
-        if (*p & TEST_RELAY_ON) {
+        g_lastState = (int)(*p - 48);
+        g_lastLength = length;
+        if (g_lastState & TEST_FILTER_ON) {
             g_relayOn = true;
-            btn.ledOn(0, 0, 255, 0);
-        }
-        else {
-            g_relayOn = false;
-            btn.ledOn(0, 255, 0, 0);
-        }
-        if (*p & TEST_PUMP_ON) {
-            g_pumpOn = true;
             btn.ledOn(3, 0, 255, 0);
         }
         else {
-            g_pumpOn = false;
+            g_relayOn = false;
             btn.ledOn(3, 255, 0, 0);
         }
-        if (*p & TEST_VALVE_ON) {
-            g_valveOpen = true;
+        if (g_lastState & TEST_PUMP_ON) {
+            g_pumpOn = true;
             btn.ledOn(6, 0, 255, 0);
         }
         else {
-            g_valveOpen = false;
+            g_pumpOn = false;
             btn.ledOn(6, 255, 0, 0);
+        }
+        if (g_lastState & TEST_VALVE_ON) {
+            g_valveOpen = true;
+            btn.ledOn(9, 0, 255, 0);
+        }
+        else {
+            g_valveOpen = false;
+            btn.ledOn(9, 255, 0, 0);
         }
     }
     if (topic == "aquarium/pong") {
+        if (g_missedPingCount > 10) {
+            btn.allLedsOff();
+            client.publish("control/status", "");
+        }
         btn.ledOn(1, 0, 100, 100);
         g_receivedPing = true;
         g_missedPingCount = 0;
@@ -90,13 +99,14 @@ void subCallback(char* t, byte* p, unsigned int length)
 
 void sendPing()
 {
-    client.publish("aquarium/ping", "");
+    client.publish("control/ping", "");
 }
 
 // setup() runs once, when the device is first turned on.
 void setup()
 {
-    int appId = APP_ID;
+    Serial.begin(115200);
+    appId = APP_ID;
 
     g_connected = false;
     g_pumpOn = false;
@@ -105,8 +115,12 @@ void setup()
     g_relayOn - false;
     g_lockout = 0;
     g_missedPingCount = 0;
+    g_lastState = 0;
 
     Particle.variable("appid", appId);
+    Particle.variable("MissedPing", g_missedPingCount);
+    Particle.variable("lastState", g_lastState);
+    Particle.variable("lastLength", g_lastLength);
 
     btn.begin();
 
@@ -120,17 +134,18 @@ void setup()
         btn.ledOn(11, 100, 100, 100);
     }
     else {
-        btn.allLedsOn(255, 0, 0);
+        btn.allLedsOn(100, 0, 0);
         g_connected = false;
     }
 
-    client.publish("aquarium/status", "");
+    client.publish("control/status", "");
 }
 
 // loop() runs over and over again, as quickly as it can execute.
 void loop()
 {
     if (client.isConnected()) {
+        btn.ledOn(11, 100, 100, 100);
         EVERY_N_MILLISECONDS(1000) {
             sendPing();
             if (!g_receivedPing) {
@@ -142,7 +157,8 @@ void loop()
         client.loop();
     }
     else {
-        btn.allLedsOn(255, 0, 0);
+        btn.allLedsOn(100, 0, 0);
+        return;
     }
 
     if (g_lockout != 0) {
@@ -155,28 +171,29 @@ void loop()
     }
 
     if (g_missedPingCount > 10) {
-        btn.ledOn(1, 255, 0, 0);
+        btn.allLedsOn(100, 0, 0);
+        return;
     }
 
     if (btn.buttonOn(1)) {
         g_lockout = millis();
         if (g_relayOn)
-            client.publish("aquarium/relay/off", "");
+            client.publish("control/filter/off", "");
         else
-            client.publish("aquarium/relay/on", "");
+            client.publish("control/filter/on", "");
     }
     if (btn.buttonOn(2)) {
         g_lockout = millis();
         if (g_pumpOn)
-            client.publish("aquarium/pump/off", "");
+            client.publish("control/pump/off", "");
         else
-            client.publish("aquarium/pump/on", "");
+            client.publish("control/pump/on", "");
     }
     if (btn.buttonOn(3)) {
         g_lockout = millis();
         if (g_valveOpen)
-            client.publish("aquarium/valve/close", "");
+            client.publish("control/valve/close", "");
         else
-            client.publish("aquarium/valve/open", "");
+            client.publish("control/valve/open", "");
     }
 }
