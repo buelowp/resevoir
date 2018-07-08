@@ -8,7 +8,7 @@
 #include "InternetButton.h"
 #include "FastLED.h"
 
-#define APP_ID  18
+#define APP_ID  23
 FASTLED_USING_NAMESPACE;
 
 void subCallback(char*, byte*, unsigned int);
@@ -50,12 +50,12 @@ void subCallback(char* t, byte* p, unsigned int length)
         btn.ledOn(6, 255, 0, 0);
         g_valveOpen = false;
     }
-    if (topic == "aquarium/filter/on") {
+    if (topic == "aquarium/power/on") {
         btn.ledOn(9, 0, 255, 0);
         g_relayOn = true;
     }
-    if (topic == "aquarium/filter/off") {
-        btn.ledOn(98, 255, 0, 0);
+    if (topic == "aquarium/power/off") {
+        btn.ledOn(9, 255, 0, 0);
         g_relayOn = false;
     }
     if (topic == "aquarium/state") {
@@ -63,27 +63,27 @@ void subCallback(char* t, byte* p, unsigned int length)
         g_lastLength = length;
         if (g_lastState & TEST_FILTER_ON) {
             g_relayOn = true;
-            btn.ledOn(3, 0, 255, 0);
-        }
-        else {
-            g_relayOn = false;
-            btn.ledOn(3, 255, 0, 0);
-        }
-        if (g_lastState & TEST_PUMP_ON) {
-            g_pumpOn = true;
-            btn.ledOn(6, 0, 255, 0);
-        }
-        else {
-            g_pumpOn = false;
-            btn.ledOn(6, 255, 0, 0);
-        }
-        if (g_lastState & TEST_VALVE_ON) {
-            g_valveOpen = true;
             btn.ledOn(9, 0, 255, 0);
         }
         else {
-            g_valveOpen = false;
+            g_relayOn = false;
             btn.ledOn(9, 255, 0, 0);
+        }
+        if (g_lastState & TEST_PUMP_ON) {
+            g_pumpOn = true;
+            btn.ledOn(3, 0, 255, 0);
+        }
+        else {
+            g_pumpOn = false;
+            btn.ledOn(3, 255, 0, 0);
+        }
+        if (g_lastState & TEST_VALVE_ON) {
+            g_valveOpen = true;
+            btn.ledOn(6, 0, 255, 0);
+        }
+        else {
+            g_valveOpen = false;
+            btn.ledOn(6, 255, 0, 0);
         }
     }
     if (topic == "aquarium/pong") {
@@ -131,7 +131,7 @@ void setup()
         delay(3000);
         btn.allLedsOff();
         g_connected = true;
-        btn.ledOn(11, 100, 100, 100);
+        btn.ledOn(11, 0, 100, 0);
     }
     else {
         btn.allLedsOn(100, 0, 0);
@@ -145,7 +145,7 @@ void setup()
 void loop()
 {
     if (client.isConnected()) {
-        btn.ledOn(11, 100, 100, 100);
+        btn.ledOn(11, 0, 100, 0);
         EVERY_N_MILLISECONDS(1000) {
             sendPing();
             if (!g_receivedPing) {
@@ -175,12 +175,12 @@ void loop()
         return;
     }
 
-    if (btn.buttonOn(1)) {
+    if (btn.buttonOn(4)) {
         g_lockout = millis();
         if (g_relayOn)
-            client.publish("control/filter/off", "");
+            client.publish("control/power/off", "");
         else
-            client.publish("control/filter/on", "");
+            client.publish("control/power/on", "");
     }
     if (btn.buttonOn(2)) {
         g_lockout = millis();

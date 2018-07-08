@@ -30,10 +30,9 @@ def get_ip_address():
 def turn_pump_on():
     print("Turning pump on")
     global g_relayAddress
-    if relayExp.readChannel(g_relayAddress, 1) == 0:
+    if relayExp.readChannel(g_relayAddress, 0) == 0:
         if relayExp.setChannel(g_relayAddress, 0, 1) == 0:
             client.publish("aquarium/pump/on")
-
     print_status()
 
 
@@ -64,23 +63,25 @@ def close_valve():
     if relayExp.readChannel(g_relayAddress, 0) == 1:
         turn_pump_off()
 
-    if relayExp.setChannel(g_relayAddress, 1, 0) == 0:
+    if relayExp.setChannel(g_relayAddress, 1, 1) == 0:
         client.publish("aquarium/valve/close")
     print_status()
 
 def turn_filter_on():
-    print ("Turning filter on")
-    if g_gpioHandler.getValue() == 0:
+    print ("Turning power strip on")
+    value = g_gpioHandler.getValue()
+    if (int)(value) == 0:
         g_gpioHandler.setValue(1)
-        client.publish("aquarium/filter/on")
+        client.publish("aquarium/power/on")
     print_status()
         
  
 def turn_filter_off():
-    print ("Turning filter off")
-    if g_gpioHandler.getValue() == 1:
+    print ("Turning power strip off")
+    value = g_gpioHandler.getValue()
+    if (int)(value) == 1:
         g_gpioHandler.setValue(0)
-        client.publish("aquarium/filter/off")
+        client.publish("aquarium/power/off")
     print_status()
      
 
@@ -174,6 +175,7 @@ def on_disconnect(c, ud, rc):
 
 def on_message(c, ud, message):
     global g_pingSuccess, g_pingFailCount, g_pingStarted, g_buttonsConnected
+    print ("Message topic received "  + message.topic)
     if message.topic == "control/pump/on":
         turn_pump_on()
 
@@ -189,10 +191,10 @@ def on_message(c, ud, message):
     if message.topic == "control/status":
         return_state()
 
-    if message.topic == "control/filter/on":
+    if message.topic == "control/power/on":
         turn_filter_on()
         
-    if  message.topic == "control/filter/off":
+    if  message.topic == "control/power/off":
         turn_filter_off()
         
     if message.topic == "control/ping":
